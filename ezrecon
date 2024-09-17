@@ -7,6 +7,25 @@
 ##prereqs
 ##nmap,ffuf,nikto
 
+
+is_valid_ipv4() {
+    local ip=$1
+    local stat=1
+
+    if [[ $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        OIFS=$IFS
+        IFS='.'
+        ip=($ip)
+        IFS=$OIFS
+        [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
+        stat=$?
+    fi
+    return $stat
+}
+
+
+
+
 echo "##################################"
 echo "#          Recon Script          #"
 echo "#                                #"
@@ -16,12 +35,12 @@ echo "#  Basic port scan, Enumerates   #"
 echo "#    Versions, If port 80 found  #"
 echo "#    runs nikto and ffuf scans,  #"
 echo "#    Then runs Full port scan    #"
-echo "#              v.1.1             #"
+echo "#              v.1.2             #"
 echo "##################################"
 set -u
 ###Ip input
 echo "- - - - - - - - - - - - - - - - -"
-echo "           Input the IP          "
+echo "    Input the IP  or Hostname    "
 echo "- - - - - - - - - - - - - - - - -"
 read -r ip
 start=$SECONDS  ####timer
@@ -105,6 +124,15 @@ if cat "$ports" | grep "80" > /dev/null;
 						echo  -e "\e[1;36m             Scanning \e[0m"
 						ffuf -u http://"$ip"/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -c  -o "$working_dir"ffuf -of html -e '.txt,.html,.php,.pdf,.zip,.doc,.js' > /dev/null
 						echo -e "\e[1;32m               DONE       \e[0m"
+						echo "- - - - - - - - - - - - - - - - -"
+						echo "           ffuf VHOSTs           "
+						echo "- - - - - - - - - - - - - - - - -"
+						if ! is_valid_ipv4 $ip; then
+							command_output=$(ffuf -w /usr/share/wordlists/seclists/Usernames/top-usernames-shortlist.txt -H "Host: FUZZ.$ip" -u http://$ip)
+							size=$(echo "$command_output" | grep -oP '(?<=Size: )\d+' | head -n 1)                                                                                                                              
+							ffuf -w /usr/share/wordlists/seclists/Discovery/DNS/subdomains-top1million-110000.txt -H "Host: FUZZ.$ip" -u http://$ip -fs $size             
+						fi                                                                                                                              
+
 ###Full port scan######
 						nmap_full_results1=$userpwd/reports/$ip'recon'/nmap_full
 						echo "- - - - - - - - - - - - - - - - -"
